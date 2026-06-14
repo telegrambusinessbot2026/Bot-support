@@ -7,12 +7,13 @@ import database
 send_to_discord_callback = None
 
 INTERVIEW_QUESTIONS = [
-    "1. Ningalude peru enthanu?",
-    "2. Ningalude vayas etra aanu?",
-    "3. Admin aavanulla karanam enthanu?",
-    "4. Munp ethengilum serveril admin aayittundo?",
-    "5. Oru issue vannal engane handle cheyyum?",
-    "6. Ningalude timezone ethanu?"
+    "(Yes/No)",
+    "1. Basic Details: Ningalude muzhuvan peru enthanu? Ennitt ningalude prayam (age) onnu parayamo?",
+    "2. Priority Rules: Ithil ethavum mukhyapettathayi ningalkku thonnunnathu ethaanu? Entukondu?",
+    "3. Handling Misbehavior: Rules 1 & 2 lamghichukondu aarenkilum group-il therivili parayukayo, athukellengil mattullavare DM cheyyan nirbandhikkukayo cheythal, ningal engane mathramayi aayirikkum athine handle cheyyuka?",
+    "4. Spam & Promotion: Rule 3, 5, 7 prakaram spam messages-um, anuvadamilathe ulla parasyangalum thadayunthil ningalude nilapaad enthanu? Oru verification illatha promotion kandu koodiyal ningal enthu nadapadi aayirikkum edukka?",
+    "5. Responsibility: Group-il nadakkunna niyamalanghanangal sraddhayilpettal, athu report cheyyunathinum nadapadi edukunnathinum oru divasam ningalkku ethra neram samayam mathi aayirikkum?",
+    "6. New Ideas: Nammude group-inte suraksha (security) kootunnathinum, member-skk vendi kooduthal nalla karyangal cheyyunnathinum ningalkku enthenkilum puthiya ideas undo?"
 ]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -50,12 +51,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if text == '📢 Support':
         await database.update_user_state(user_id, 'SUPPORT')
-        await update.message.reply_text("📢 Ningalude prashnam enthanu? Thazhe type cheyyuka. Njagalude admins udane marupadi nalkum.")
+        await update.message.reply_text("📢 Ningalude support ticket create aayittund! Ningalkku enthaanu adminnod parayanullathu, athu ivide parayavunnathaanu.")
         return
         
     elif text == '🛡️ Admin Application':
         await database.update_user_state(user_id, 'ADMIN_STEP_0')
-        await update.message.reply_text("🛡️ Admin aavanulla interview thudangukayanu. " + INTERVIEW_QUESTIONS[0])
+        await update.message.reply_text("🛡️ Rules Confirmation: Nammude group rules ningal mothathil vayichu nokkiyo? " + INTERVIEW_QUESTIONS[0])
         return
         
     elif text == '📜 Rules':
