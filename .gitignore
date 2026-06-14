@@ -1,0 +1,6 @@
+.env
+bridge.db
+__pycache__/
+*.pyc
+.venv/
+venv/
