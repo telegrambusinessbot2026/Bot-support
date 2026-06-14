@@ -7,6 +7,53 @@ logger = logging.getLogger(__name__)
 # Injected from main.py
 send_to_telegram_callback = None
 
+class LogView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def get_user_id_from_embed(self, message: discord.Message):
+        if message.embeds:
+            desc = message.embeds[0].description
+            for line in desc.split('\n'):
+                if "Telegram User ID:" in line:
+                    return int(line.split(":")[1].strip())
+        return None
+
+    @discord.ui.button(label="Delete Channel", style=discord.ButtonStyle.danger, custom_id="log_delete_channel")
+    async def delete_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_id = await self.get_user_id_from_embed(interaction.message)
+        if not user_id: 
+            return await interaction.response.send_message("Could not find user ID.", ephemeral=True)
+            
+        ch_id = await database.get_discord_channel(user_id, 'Support')
+        if not ch_id:
+            ch_id = await database.get_discord_channel(user_id, 'Admin')
+            
+        if ch_id:
+            ch = interaction.guild.get_channel(ch_id)
+            if ch:
+                await ch.delete(reason="Admin requested deletion via Log button.")
+            await database.delete_channel_mapping(ch_id)
+            await interaction.response.send_message("Channel deleted and unmapped.", ephemeral=True)
+        else:
+            await interaction.response.send_message("No active channel found for this user.", ephemeral=True)
+
+    @discord.ui.button(label="Feedback/Resolution", style=discord.ButtonStyle.success, custom_id="log_send_feedback")
+    async def send_feedback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_id = await self.get_user_id_from_embed(interaction.message)
+        if not user_id: return
+        if send_to_telegram_callback:
+            await send_to_telegram_callback(user_id, "✅ Ningalude issue pariharichittund. Abhiprayam ariyikkuka!")
+        await interaction.response.send_message("Feedback requested sent to Telegram.", ephemeral=True)
+
+    @discord.ui.button(label="Check Status", style=discord.ButtonStyle.primary, custom_id="log_check_status")
+    async def check_status(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_id = await self.get_user_id_from_embed(interaction.message)
+        if not user_id: return
+        if send_to_telegram_callback:
+            await send_to_telegram_callback(user_id, "⏳ Ningalude issue/interview status njangal check cheyyukayanu. Dayavayi kaathirikkuka.")
+        await interaction.response.send_message("Status inquiry sent to Telegram.", ephemeral=True)
+
 class KanthariDiscordBot(discord.Client):
     def __init__(self, guild_id: int):
         intents = discord.Intents.default()
@@ -16,8 +63,7 @@ class KanthariDiscordBot(discord.Client):
         self.target_guild_id = guild_id
         
     async def setup_hook(self):
-        # We will do background tasks if needed
-        pass
+        self.add_view(LogView())
 
     async def on_ready(self):
         logger.info(f'Logged in as {self.user}')
@@ -37,7 +83,8 @@ class KanthariDiscordBot(discord.Client):
         categories = {
             'Support': None,
             'Admin': None,
-            'Rules': None
+            'Rules': None,
+            'Management': None
         }
         
         for cat in guild.categories:
@@ -48,6 +95,14 @@ class KanthariDiscordBot(discord.Client):
             if not cat:
                 categories[name] = await guild.create_category(name)
                 logger.info(f"Created category: {name}")
+                
+        # Ensure log channels exist
+        mgmt_category = categories['Management']
+        for log_ch in ['support-logs', 'admin-logs']:
+            ch = discord.utils.get(mgmt_category.channels, name=log_ch)
+            if not ch:
+                await guild.create_text_channel(log_ch, category=mgmt_category)
+                logger.info(f"Created log channel: {log_ch}")
                 
         # Ensure rules channels exist and fetch rules
         rule_langs = ['English', 'Malayalam', 'Hindi', 'Manglish']
@@ -102,6 +157,15 @@ class KanthariDiscordBot(discord.Client):
             channel_name = f"{category_name.lower()}-{username.lower()}"
             channel = await guild.create_text_channel(channel_name, category=category)
             await database.save_channel_mapping(user_id, channel.id, category_name)
+            
+            # Post to log channel
+            log_ch_name = f"{category_name.lower()}-logs"
+            mgmt_cat = discord.utils.get(guild.categories, name="Management")
+            log_ch = discord.utils.get(mgmt_cat.channels, name=log_ch_name) if mgmt_cat else None
+            if log_ch:
+                embed = discord.Embed(title=f"New {category_name} Request", color=discord.Color.green())
+                embed.description = f"User Name: {username}\nTelegram User ID: {user_id}\nChannel: <#{channel.id}>"
+                await log_ch.send(embed=embed, view=LogView())
             
         # Send message
         await channel.send(f"**From {username}:**\n{text}")

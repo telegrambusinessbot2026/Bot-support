@@ -73,6 +73,11 @@ async def get_telegram_user_from_channel(channel_id: int):
                 return row[0]
             return None
 
+async def delete_channel_mapping(channel_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('DELETE FROM channels WHERE discord_channel_id = ?', (channel_id,))
+        await db.commit()
+
 async def update_rule(language: str, content: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('INSERT OR REPLACE INTO rules (language, content) VALUES (?, ?)', (language, content))

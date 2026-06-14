@@ -1,5 +1,5 @@
 import os
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 import database
 
@@ -21,11 +21,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await database.update_user_state(user.id, 'IDLE')
     
     keyboard = [
-        [InlineKeyboardButton("📢 Support", callback_data='btn_support')],
-        [InlineKeyboardButton("🛡️ Admin Application", callback_data='btn_admin')],
-        [InlineKeyboardButton("📜 Rules", callback_data='btn_rules')]
+        ["📢 Support", "🛡️ Admin Application"],
+        ["📜 Rules"]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
         f"Namaskaram {user.first_name}! Kanthari Commandilekku swagatham. Thazhe ulla options select cheyyuka:",
@@ -39,15 +38,27 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     data = query.data
     
-    if data == 'btn_support':
+    if data.startswith('rule_'):
+        language = data.split('_')[1]
+        rule_content = await database.get_rule(language)
+        await query.edit_message_text(text=f"📜 **{language} Rules:**\n\n{rule_content}")
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username or update.effective_user.first_name
+    text = update.message.text
+    
+    if text == '📢 Support':
         await database.update_user_state(user_id, 'SUPPORT')
-        await query.edit_message_text(text="📢 Ningalude prashnam enthanu? Thazhe type cheyyuka. Njagalude admins udane marupadi nalkum.")
+        await update.message.reply_text("📢 Ningalude prashnam enthanu? Thazhe type cheyyuka. Njagalude admins udane marupadi nalkum.")
+        return
         
-    elif data == 'btn_admin':
+    elif text == '🛡️ Admin Application':
         await database.update_user_state(user_id, 'ADMIN_STEP_0')
-        await query.edit_message_text(text="🛡️ Admin aavanulla interview thudangukayanu. " + INTERVIEW_QUESTIONS[0])
+        await update.message.reply_text("🛡️ Admin aavanulla interview thudangukayanu. " + INTERVIEW_QUESTIONS[0])
+        return
         
-    elif data == 'btn_rules':
+    elif text == '📜 Rules':
         keyboard = [
             [
                 InlineKeyboardButton("English", callback_data='rule_English'),
@@ -59,22 +70,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text="📜 Etha language vendath?", reply_markup=reply_markup)
+        await update.message.reply_text("📜 Etha language vendath?", reply_markup=reply_markup)
+        return
         
-    elif data.startswith('rule_'):
-        language = data.split('_')[1]
-        rule_content = await database.get_rule(language)
-        await query.edit_message_text(text=f"📜 **{language} Rules:**\n\n{rule_content}")
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    username = update.effective_user.username or update.effective_user.first_name
-    text = update.message.text
-    
     state = await database.get_user_state(user_id)
     
     if state == 'IDLE':
-        await update.message.reply_text("Dayaavayi /start upayogich menu select cheyyuka.")
+        await update.message.reply_text("Dayaavayi menuvil ninnum oru option select cheyyuka.")
         return
         
     elif state == 'SUPPORT':
