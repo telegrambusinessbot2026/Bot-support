@@ -188,8 +188,16 @@ class KanthariDiscordBot(discord.Client):
                 clean_name = f"user-{user_id}"
                 
             channel_name = f"{category_name.lower()}-{clean_name}"
-            channel = await guild.create_text_channel(channel_name, category=category)
-            await database.save_channel_mapping(user_id, channel.id, category_name)
+            
+            try:
+                channel = await guild.create_text_channel(channel_name, category=category)
+                await database.save_channel_mapping(user_id, channel.id, category_name)
+            except Exception as e:
+                logger.error(f"DEBUG: Failed to create channel '{channel_name}' for user {user_id}. Reason: {e}")
+                print(f"DEBUG ERROR: Failed to create channel. Reason: {e}")
+                if category_name == 'Support' and send_to_telegram_callback:
+                    await send_to_telegram_callback(user_id, "Channel create cheyyan pattiyailla. Admins-odu parayuka.")
+                return
             
             # Post to log channel
             log_ch_name = f"{category_name.lower()}-logs"

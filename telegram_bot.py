@@ -37,6 +37,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     user_id = query.from_user.id
+    username = query.from_user.username or query.from_user.first_name
+    await database.get_or_create_user(user_id, username)
+    
     data = query.data
     
     if data.startswith('rule_'):
@@ -59,9 +62,49 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or update.effective_user.first_name
     text = update.message.text
     
+    await database.get_or_create_user(user_id, username)
+    state = await database.get_user_state(user_id)
+    
+    if state == 'WAITING_FOR_COMPLAINT' or state == 'SUPPORT':
+        if state == 'WAITING_FOR_COMPLAINT':
+            await database.update_user_state(user_id, 'SUPPORT')
+        if send_to_discord_callback:
+            await send_to_discord_callback(user_id, username, 'Support', text)
+        return
+            
+    elif state == 'ADMIN_STEP_0':
+        await update.message.reply_text("Dayaavayi mukalil ulla Yes/No button upayogikkuka.")
+        return
+
+    elif state.startswith('ADMIN_STEP_'):
+        step = int(state.split('_')[2])
+        
+        # Send their answer to the discord admin channel
+        if send_to_discord_callback:
+            try:
+                await send_to_discord_callback(user_id, username, 'Admin', f"**Q:** {INTERVIEW_QUESTIONS[step]}\n**A:** {text}")
+            except Exception as e:
+                import logging
+                logging.error(f"Failed to forward answer to discord: {e}")
+        
+        next_step = step + 1
+        if next_step < len(INTERVIEW_QUESTIONS):
+            await database.update_user_state(user_id, f'ADMIN_STEP_{next_step}')
+            await update.message.reply_text(INTERVIEW_QUESTIONS[next_step])
+        else:
+            await database.update_user_state(user_id, 'ADMIN_DONE')
+            await update.message.reply_text("Interview theernnu! Admins udane marupadi nalkum.")
+        return
+            
+    elif state == 'ADMIN_DONE':
+        if send_to_discord_callback:
+            await send_to_discord_callback(user_id, username, 'Admin', text)
+        return
+
+    # If state is IDLE, check for menu commands
     if text == '📢 Support':
-        await database.update_user_state(user_id, 'SUPPORT')
-        await update.message.reply_text("📢 Ningalude prashnam enthanu? Thazhe type cheyyuka. Njagalude admins udane marupadi nalkum.")
+        await database.update_user_state(user_id, 'WAITING_FOR_COMPLAINT')
+        await update.message.reply_text("Ningalude complaint enthanennu chodhikkuka.")
         return
         
     elif text == '🛡️ Admin Application':
@@ -89,44 +132,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📜 Etha language vendath?", reply_markup=reply_markup)
         return
         
-    state = await database.get_user_state(user_id)
-    
-    if state == 'IDLE':
-        await update.message.reply_text("Dayaavayi menuvil ninnum oru option select cheyyuka.")
-        return
+    # If no menu item matched and state is IDLE
+    await update.message.reply_text("Dayaavayi menuvil ninnum oru option select cheyyuka.")
         
-    elif state == 'SUPPORT':
-        # Send to discord support channel
-        if send_to_discord_callback:
-            await send_to_discord_callback(user_id, username, 'Support', text)
-            
-    elif state == 'ADMIN_STEP_0':
-        await update.message.reply_text("Dayaavayi mukalil ulla Yes/No button upayogikkuka.")
-        return
 
-    elif state.startswith('ADMIN_STEP_'):
-        step = int(state.split('_')[2])
-        
-        # Send their answer to the discord admin channel
-        if send_to_discord_callback:
-            try:
-                await send_to_discord_callback(user_id, username, 'Admin', f"**Q:** {INTERVIEW_QUESTIONS[step]}\n**A:** {text}")
-            except Exception as e:
-                import logging
-                logging.error(f"Failed to forward answer to discord: {e}")
-        
-        next_step = step + 1
-        if next_step < len(INTERVIEW_QUESTIONS):
-            await database.update_user_state(user_id, f'ADMIN_STEP_{next_step}')
-            await update.message.reply_text(INTERVIEW_QUESTIONS[next_step])
-        else:
-            await database.update_user_state(user_id, 'ADMIN_DONE')
-            await update.message.reply_text("Interview theernnu! Admins udane marupadi nalkum.")
-            
-    elif state == 'ADMIN_DONE':
-        # Send followups to admin channel
-        if send_to_discord_callback:
-            await send_to_discord_callback(user_id, username, 'Admin', text)
 
 async def send_to_telegram(app: Application, user_id: int, message: str):
     await app.bot.send_message(chat_id=user_id, text=message)
