@@ -158,11 +158,34 @@ class KanthariDiscordBot(discord.Client):
         if not isinstance(message.channel, discord.TextChannel):
             return
             
+        # Check if it's a rule update
+        if message.channel.category and message.channel.category.name == 'Rules':
+            language = message.channel.name.capitalize()
+            if language in ['English', 'Malayalam', 'Hindi', 'Manglish']:
+                await database.update_rule(language, message.content)
+                logger.info(f"Updated cached rule for {language}")
+                await message.channel.send("Rule successfully updated and synced to the bot.")
+                return
+            
         # Check if the channel is mapped to a telegram user
         user_id = await database.get_telegram_user_from_channel(message.channel.id)
         if user_id and send_to_telegram_callback:
             # Forward the admin's message back to telegram user
             await send_to_telegram_callback(user_id, message.content)
+
+    async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        if after.author == self.user:
+            return
+            
+        if not isinstance(after.channel, discord.TextChannel):
+            return
+            
+        if after.channel.category and after.channel.category.name == 'Rules':
+            language = after.channel.name.capitalize()
+            if language in ['English', 'Malayalam', 'Hindi', 'Manglish']:
+                await database.update_rule(language, after.content)
+                logger.info(f"Updated cached rule for {language} via edit")
+                await after.channel.send("Rule successfully updated and synced to the bot.")
 
     async def send_from_telegram(self, user_id: int, username: str, category_name: str, text: str):
         guild = self.get_guild(self.target_guild_id)
