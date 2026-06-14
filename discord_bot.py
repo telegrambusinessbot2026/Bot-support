@@ -185,9 +185,9 @@ class KanthariDiscordBot(discord.Client):
             import re
             clean_name = re.sub(r'[^a-z0-9-]', '', username.lower())
             if not clean_name:
-                clean_name = f"user-{user_id}"
+                clean_name = "user"
                 
-            channel_name = f"{category_name.lower()}-{clean_name}"
+            channel_name = f"{clean_name}-{user_id}"
             
             try:
                 channel = await guild.create_text_channel(channel_name, category=category)
