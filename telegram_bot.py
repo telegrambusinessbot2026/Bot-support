@@ -7,13 +7,13 @@ import database
 send_to_discord_callback = None
 
 INTERVIEW_QUESTIONS = [
-    "1. (Yes/No)"
-    "2. Basic Details: Ningalude muzhuvan peru enthanu? Ennitt ningalude prayam (age) onnu parayamo?",
-    "3. Priority Rules: Ithil ethavum mukhyapettathayi ningalkku thonnunnathu ethaanu? Entukondu?",
-    "4. Handling Misbehavior: Rules 1 & 2 lamghichukondu aarenkilum group-il therivili parayukayo, athukellengil mattullavare DM cheyyan nirbandhikkukayo cheythal, ningal engane mathramayi aayirikkum athine handle cheyyuka?",
-    "5. Spam & Promotion: Rule 3, 5, 7 prakaram spam messages-um, anuvadamilathe ulla parasyangalum thadayunthil ningalude nilapaad enthanu? Oru verification illatha promotion kandu koodiyal ningal enthu nadapadi aayirikkum edukka?",
-    "6. Responsibility: Group-il nadakkunna niyamalanghanangal sraddhayilpettal, athu report cheyyunathinum nadapadi edukunnathinum oru divasam ningalkku ethra neram samayam mathi aayirikkum?",
-    "7. New Ideas: Nammude group-inte suraksha (security) kootunnathinum, member-skk vendi kooduthal nalla karyangal cheyyunnathinum ningalkku enthenkilum puthiya ideas undo?"
+    "1. (Yes/No)",
+    "2. Ningalude muzhuvan peru enthanu? Ennitt ningalude prayam (age) onnu parayamo?",
+    "3. Ithil ethavum mukhyapettathayi ningalkku thonnunnathu ethaanu? Entukondu?",
+    "4. Rules 1 & 2 lamghichukondu aarenkilum group-il therivili parayukayo, athukellengil mattullavare DM cheyyan nirbandhikkukayo cheythal, ningal engane mathramayi aayirikkum athine handle cheyyuka?",
+    "5. Rule 3, 5, 7 prakaram spam messages-um, anuvadamilathe ulla parasyangalum thadayunthil ningalude nilapaad enthanu? Oru verification illatha promotion kandu koodiyal ningal enthu nadapadi aayirikkum edukka?",
+    "6. Group-il nadakkunna niyamalanghanangal sraddhayilpettal, athu report cheyyunathinum nadapadi edukunnathinum oru divasam ningalkku ethra neram samayam mathi aayirikkum?",
+    "7. Nammude group-inte suraksha (security) kootunnathinum, member-skk vendi kooduthal nalla karyangal cheyyunnathinum ningalkku enthenkilum puthiya ideas undo?"
 ]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
