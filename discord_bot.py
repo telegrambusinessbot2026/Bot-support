@@ -62,7 +62,7 @@ async def sync_all_rules_channels():
 @dc_client.event
 async def on_ready():
     global _primary_guild, _rules_channel_map, _discord_ready
-    print(f"Discord logged in as {dc_client.user}")
+    print(f"Kanthari Command | Discord logged in as {dc_client.user}")
 
     guild = dc_client.get_guild(DISCORD_GUILD_ID) if DISCORD_GUILD_ID else None
     if not guild and dc_client.guilds:

@@ -5,7 +5,7 @@ from aiohttp import web
 from dotenv import load_dotenv
 from telegram.ext import Application
 
-from config import DISCORD_TOKEN, TELEGRAM_TOKEN
+from config import BOT_NAME, DISCORD_TOKEN, TELEGRAM_TOKEN
 from database import init_db
 from discord_bot import dc_client, is_discord_ready, set_tg_bot
 from telegram_handlers import register_telegram_handlers
@@ -14,7 +14,7 @@ load_dotenv()
 
 
 async def health_check(_request):
-    return web.Response(text="Bot is running!")
+    return web.Response(text=f"{BOT_NAME} is running!")
 
 
 async def start_web_server():
@@ -53,13 +53,13 @@ async def main():
 
     discord_task = asyncio.create_task(dc_client.start(DISCORD_TOKEN))
     await wait_for_discord()
-    print("Discord bot ready.")
+    print(f"{BOT_NAME}: Discord bot ready.")
 
     await tg_app.initialize()
     await tg_app.start()
     await tg_app.bot.delete_webhook(drop_pending_updates=False)
     await tg_app.updater.start_polling(drop_pending_updates=False)
-    print("Telegram bot started.")
+    print(f"{BOT_NAME}: Telegram bot started.")
 
     await discord_task
 

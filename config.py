@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+BOT_NAME = os.getenv("BOT_NAME", "Kanthari Command")
+
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 

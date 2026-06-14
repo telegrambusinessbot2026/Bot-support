@@ -1,12 +1,12 @@
-# Telegram ↔ Discord Support Bridge Bot
+# Kanthari Command — Telegram ↔ Discord Bridge Bot
 
-Python bot that connects Telegram users with Discord admin channels. User mappings, rules, and interview progress are stored in SQLite so data survives restarts.
+Python bot named **Kanthari Command** that connects Telegram users with Discord admin channels. User mappings, rules, and interview progress are stored in SQLite so data survives restarts.
 
 ## Features
 
-- **Support button** — Creates or reuses a private Discord channel under the **Support** category for the user
-- **Admin Application button** — Creates or reuses a private channel under **Admin**, then runs a 6-step interview
-- **Rules button** — Lets users pick English, Malayalam, Hindi, or Manglish; content is read from Discord **Rules** channels and cached in SQLite
+- **📢 Support** — Starts the complaint workflow; creates or reuses a private Discord channel under **Support**
+- **🛡️ Admin Application** — Creates or reuses a private channel under **Admin**, then runs a 6-step interview
+- **📜 Rules** — Sub-menu with English, Malayalam, Hindi, Manglish; content synced from Discord **Rules** channels into SQLite
 - **Two-way sync** — Telegram messages go to the active channel; Discord admin replies go back to Telegram (with @mention support)
 - **Manglish UI** — All Telegram bot prompts are in Manglish
 
@@ -14,7 +14,7 @@ Python bot that connects Telegram users with Discord admin channels. User mappin
 
 ### 1. Create bots
 
-1. **Telegram:** Talk to [@BotFather](https://t.me/BotFather), create a bot, copy the token.
+1. **Telegram:** Talk to [@BotFather](https://t.me/BotFather), create a bot named **Kanthari Command**, copy the token.
 2. **Discord:** [Discord Developer Portal](https://discord.com/developers/applications) → New Application → Bot → copy token.
 3. Enable **Message Content Intent** and **Server Members Intent** for the Discord bot.
 4. Invite the bot to your server with permissions: Manage Channels, Send Messages, Read Message History, Attach Files.
@@ -42,16 +42,18 @@ On first run the bot creates (if missing):
 | **Admin** | `admin-{username}-{telegram_id}` per user |
 | **Rules** | `english-rules`, `malayalam-rules`, `hindi-rules`, `manglish-rules` |
 
+Existing user ↔ channel mappings are loaded from `bridge.db` on restart — no duplicate channels are created.
+
 ### 4. Rules content
 
 Post or edit messages in the Rules Discord channels. The bot syncs them to SQLite automatically. Telegram users see the cached text when they pick a language.
 
 ## Usage (Telegram)
 
-1. Send `/start` to the bot in a **private chat**.
-2. Tap **Support** to open a support channel and start messaging admins.
-3. Tap **Admin Application** to apply (6 questions) and chat in the admin channel.
-4. Tap **Rules** and choose a language.
+1. Send `/start` to **Kanthari Command** in a **private chat**.
+2. Tap **📢 Support** to open a support channel and submit your complaint.
+3. Tap **🛡️ Admin Application** to apply (6 questions) and chat in the admin channel.
+4. Tap **📜 Rules** and choose a language.
 
 ## Data persistence
 
@@ -77,6 +79,6 @@ database.py          SQLite layer
 config.py            Environment config
 strings.py           Manglish UI text
 bridge.py            Channel creation & message forwarding
-telegram_handlers.py Telegram buttons, interview, sync
+telegram_handlers.py Telegram inline buttons, interview, sync
 discord_bot.py       Discord events & rules sync
 ```

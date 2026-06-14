@@ -1,25 +1,26 @@
-"""Manglish UI strings for Telegram user interactions."""
+"""Manglish UI strings for Kanthari Command Telegram interactions."""
+
+from config import BOT_NAME
 
 WELCOME = (
-    "Welcome bro! 👋\n\n"
+    f"Welcome to {BOT_NAME}! 👋\n\n"
     "Njan Telegram-um Discord-um connect cheyyunna support bot aanu.\n"
     "Thazhe ulla button use cheythu ninte option select cheyyu:"
 )
 
-MAIN_MENU_HINT = "Option select cheyyu 👇"
-
-BTN_SUPPORT = "🛟 Support"
-BTN_ADMIN = "📋 Admin Application"
+BTN_SUPPORT = "📢 Support"
+BTN_ADMIN = "🛡️ Admin Application"
 BTN_RULES = "📜 Rules"
 BTN_BACK = "⬅️ Back"
 
 SUPPORT_READY = (
-    "Super! Ninte Support channel ready aanu. ✅\n"
-    "Ippo message type cheyy — admin team Discord-il real-time kaanum."
+    "Super! Ninte Support channel ready aanu. ✅\n\n"
+    "Complaint workflow start cheythu — ninte issue detail aayi type cheyy.\n"
+    "Admin team Discord-il real-time kaanum."
 )
 SUPPORT_EXISTING = (
-    "Ninte Support channel already undu. ✅\n"
-    "Message type cheythal admin team kanum."
+    "Ninte Support channel already undu. ✅\n\n"
+    "Complaint continue cheyyam — message type cheythal admin team kanum."
 )
 
 ADMIN_CHANNEL_READY = (
@@ -34,10 +35,10 @@ ADMIN_CHANNEL_EXISTING = (
 RULES_PICK_LANGUAGE = "Rules evide language-il venum? Select cheyyu 👇"
 
 RULES_LANG_LABELS = {
-    "english": "🇬🇧 English",
-    "malayalam": "🇮🇳 Malayalam",
-    "hindi": "🇮🇳 Hindi",
-    "manglish": "💬 Manglish",
+    "english": "English",
+    "malayalam": "Malayalam",
+    "hindi": "Hindi",
+    "manglish": "Manglish",
 }
 
 RULES_EMPTY = "Sorry bro, ee language-il rules ippol available alla. Admin update cheyyum."
@@ -58,8 +59,8 @@ INTERVIEW_COMPLETE = (
     "Ippo message type cheythal admin channel-il poyikum."
 )
 
-INTERVIEW_IN_PROGRESS = "Interview in progress aanu. Question answer cheyyu bro."
-
 USE_MENU_FIRST = "Menu use cheythu Support or Admin select cheyyu bro."
 
 INVALID_AGE = "Valid number type cheyyu bro (e.g. 21)."
+
+DISCORD_NOT_READY = "Discord connect aayilla bro. Admin contact cheyyu."

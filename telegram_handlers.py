@@ -89,7 +89,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_support_action(query, user):
     guild = get_guild()
     if not guild:
-        await query.edit_message_text("Discord connect aayilla bro. Admin contact cheyyu.")
+        await query.edit_message_text(S.DISCORD_NOT_READY)
         return
 
     channel, created = await ensure_user_channel(dc_client, guild, user, CHANNEL_SUPPORT)
@@ -102,7 +102,7 @@ async def handle_support_action(query, user):
 async def handle_admin_action(query, user):
     guild = get_guild()
     if not guild:
-        await query.edit_message_text("Discord connect aayilla bro. Admin contact cheyyu.")
+        await query.edit_message_text(S.DISCORD_NOT_READY)
         return
 
     channel, created = await ensure_user_channel(dc_client, guild, user, CHANNEL_ADMIN)
