@@ -27,7 +27,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
-        f"Namaskaram {user.first_name}! Kanthari Commandilekku swagatham. Thazhe ulla options select cheyyuka:",
+        f"Namaskaram {user.first_name}! Kanthari support teamine contact cheythathinnu nanni. Ningalkku njan enthu help cheyyatte? Please adiyilulla listil ninnu correct option select cheyyoo.",
         reply_markup=reply_markup
     )
 
