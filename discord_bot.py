@@ -182,7 +182,12 @@ class KanthariDiscordBot(discord.Client):
             if not category:
                 category = await guild.create_category(category_name)
                 
-            channel_name = f"{category_name.lower()}-{username.lower()}"
+            import re
+            clean_name = re.sub(r'[^a-z0-9-]', '', username.lower())
+            if not clean_name:
+                clean_name = f"user-{user_id}"
+                
+            channel_name = f"{category_name.lower()}-{clean_name}"
             channel = await guild.create_text_channel(channel_name, category=category)
             await database.save_channel_mapping(user_id, channel.id, category_name)
             
@@ -195,6 +200,9 @@ class KanthariDiscordBot(discord.Client):
                 embed.description = f"User Name: {username}\nTelegram User ID: {user_id}\nChannel: <#{channel.id}>"
                 view = SupportLogView() if category_name == 'Support' else AdminLogView()
                 await log_ch.send(embed=embed, view=view)
+                
+            if category_name == 'Support' and send_to_telegram_callback:
+                await send_to_telegram_callback(user_id, "Ningalude ticket create aayittundu! Ningalukku admin-umayi bandhapendan ivide vannu samsarikkunnathaanu.")
             
         # Send message
         await channel.send(f"**From {username}:**\n{text}")

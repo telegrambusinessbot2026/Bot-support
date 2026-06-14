@@ -109,7 +109,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Send their answer to the discord admin channel
         if send_to_discord_callback:
-            await send_to_discord_callback(user_id, username, 'Admin', f"**Q:** {INTERVIEW_QUESTIONS[step]}\n**A:** {text}")
+            try:
+                await send_to_discord_callback(user_id, username, 'Admin', f"**Q:** {INTERVIEW_QUESTIONS[step]}\n**A:** {text}")
+            except Exception as e:
+                import logging
+                logging.error(f"Failed to forward answer to discord: {e}")
         
         next_step = step + 1
         if next_step < len(INTERVIEW_QUESTIONS):
