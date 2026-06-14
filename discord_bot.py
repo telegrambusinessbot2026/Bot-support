@@ -43,7 +43,7 @@ class LogView(discord.ui.View):
         user_id = await self.get_user_id_from_embed(interaction.message)
         if not user_id: return
         if send_to_telegram_callback:
-            await send_to_telegram_callback(user_id, "✅ Ningalude issue pariharichittund. Abhiprayam ariyikkuka!")
+            await send_to_telegram_callback(user_id, "✅ Ningalude issue pariharichittund. Ithine kurichulla ningalude abhiprayam ariyikkuka!")
         await interaction.response.send_message("Feedback requested sent to Telegram.", ephemeral=True)
 
     @discord.ui.button(label="Check Status", style=discord.ButtonStyle.primary, custom_id="log_check_status")
@@ -51,7 +51,7 @@ class LogView(discord.ui.View):
         user_id = await self.get_user_id_from_embed(interaction.message)
         if not user_id: return
         if send_to_telegram_callback:
-            await send_to_telegram_callback(user_id, "⏳ Ningalude issue/interview status njangal check cheyyukayanu. Dayavayi kaathirikkuka.")
+            await send_to_telegram_callback(user_id, "⏳ Ningalude support ticket status njangal check cheyyukayanu. Dayavayi kshemayode kaathirikkuka.")
         await interaction.response.send_message("Status inquiry sent to Telegram.", ephemeral=True)
 
 class KanthariDiscordBot(discord.Client):
