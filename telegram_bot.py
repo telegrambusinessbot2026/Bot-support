@@ -7,7 +7,7 @@ import database
 send_to_discord_callback = None
 
 INTERVIEW_QUESTIONS = [
-    "1. (Yes/No)",
+    "1. Nammude group rules ningal mothathil vayichu nokkiyo?",
     "2. Ningalude muzhuvan peru enthanu? Ennitt ningalude prayam (age) onnu parayamo?",
     "3. Ithil ethavum mukhyapettathayi ningalkku thonnunnathu ethaanu? Entukondu?",
     "4. Rules 1 & 2 lamghichukondu aarenkilum group-il therivili parayukayo, athukellengil mattullavare DM cheyyan nirbandhikkukayo cheythal, ningal engane mathramayi aayirikkum athine handle cheyyuka?",
@@ -28,7 +28,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     await update.message.reply_text(
-        f"Namaskaram {user.first_name}! Kanthari support teamine contact cheythathinnu nanni. Ningalkku njan enthu help cheyyatte? Please adiyilulla listil ninnu correct option select cheyyoo.",
+        f"Namaskaram {user.first_name}! Kanthari Commandilekku swagatham. Thazhe ulla options select cheyyuka:",
         reply_markup=reply_markup
     )
 
@@ -43,6 +43,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         language = data.split('_')[1]
         rule_content = await database.get_rule(language)
         await query.edit_message_text(text=f"📜 **{language} Rules:**\n\n{rule_content}")
+        
+    elif data == 'admin_q1_yes':
+        await database.update_user_state(user_id, 'ADMIN_STEP_1')
+        await query.edit_message_text(text="Nallathu! Adutha chodyam:\n\n" + INTERVIEW_QUESTIONS[1])
+        if send_to_discord_callback:
+            await send_to_discord_callback(user_id, query.from_user.username or query.from_user.first_name, 'Admin', f"**Q:** {INTERVIEW_QUESTIONS[0]}\n**A:** Yes")
+            
+    elif data == 'admin_q1_no':
+        await database.update_user_state(user_id, 'IDLE')
+        await query.edit_message_text(text="Kshamikkuka, rules vayikkathe admin aavaan saadhikkilla. Dayaavayi rules vayichathinu shesham veendum sramikkuka.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -51,12 +61,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if text == '📢 Support':
         await database.update_user_state(user_id, 'SUPPORT')
-        await update.message.reply_text("📢 Ningalude support ticket create aayittund! Ningalkku enthaanu adminnod parayanullathu, athu ivide parayavunnathaanu.")
+        await update.message.reply_text("📢 Ningalude prashnam enthanu? Thazhe type cheyyuka. Njagalude admins udane marupadi nalkum.")
         return
         
     elif text == '🛡️ Admin Application':
         await database.update_user_state(user_id, 'ADMIN_STEP_0')
-        await update.message.reply_text("🛡️ Rules Confirmation: Nammude group rules ningal mothathil vayichu nokkiyo? " + INTERVIEW_QUESTIONS[0])
+        keyboard = [
+            [InlineKeyboardButton("Yes", callback_data='admin_q1_yes'),
+             InlineKeyboardButton("No", callback_data='admin_q1_no')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("🛡️ Admin aavanulla interview thudangukayanu.\n\n" + INTERVIEW_QUESTIONS[0], reply_markup=reply_markup)
         return
         
     elif text == '📜 Rules':
@@ -85,6 +100,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if send_to_discord_callback:
             await send_to_discord_callback(user_id, username, 'Support', text)
             
+    elif state == 'ADMIN_STEP_0':
+        await update.message.reply_text("Dayaavayi mukalil ulla Yes/No button upayogikkuka.")
+        return
+
     elif state.startswith('ADMIN_STEP_'):
         step = int(state.split('_')[2])
         

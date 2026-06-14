@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 # Injected from main.py
 send_to_telegram_callback = None
 
-class LogView(discord.ui.View):
+class SupportLogView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
@@ -19,40 +19,67 @@ class LogView(discord.ui.View):
                     return int(line.split(":")[1].strip())
         return None
 
-    @discord.ui.button(label="Delete Channel", style=discord.ButtonStyle.danger, custom_id="log_delete_channel")
+    @discord.ui.button(label="Delete Channel", style=discord.ButtonStyle.danger, custom_id="sup_log_delete_channel")
     async def delete_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = await self.get_user_id_from_embed(interaction.message)
         if not user_id: 
             return await interaction.response.send_message("Could not find user ID.", ephemeral=True)
             
         ch_id = await database.get_discord_channel(user_id, 'Support')
-        if not ch_id:
-            ch_id = await database.get_discord_channel(user_id, 'Admin')
-            
         if ch_id:
             ch = interaction.guild.get_channel(ch_id)
             if ch:
                 await ch.delete(reason="Admin requested deletion via Log button.")
             await database.delete_channel_mapping(ch_id)
-            await interaction.response.send_message("Channel deleted and unmapped.", ephemeral=True)
+            await interaction.response.send_message("Support Channel deleted and unmapped.", ephemeral=True)
         else:
-            await interaction.response.send_message("No active channel found for this user.", ephemeral=True)
+            await interaction.response.send_message("No active Support channel found for this user.", ephemeral=True)
 
-    @discord.ui.button(label="Feedback/Resolution", style=discord.ButtonStyle.success, custom_id="log_send_feedback")
+    @discord.ui.button(label="Support Feedback", style=discord.ButtonStyle.success, custom_id="sup_log_send_feedback")
     async def send_feedback(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = await self.get_user_id_from_embed(interaction.message)
         if not user_id: return
         if send_to_telegram_callback:
-            await send_to_telegram_callback(user_id, "✅ Ningalude issue pariharichittund. Ithine kurichulla ningalude abhiprayam ariyikkuka!")
-        await interaction.response.send_message("Feedback requested sent to Telegram.", ephemeral=True)
+            await send_to_telegram_callback(user_id, "✅ Ningalude support ticket resolve cheythittund. Ee sevanathe kurichulla abhiprayam ariyikkuka!")
+        await interaction.response.send_message("Support Feedback request sent to Telegram.", ephemeral=True)
 
-    @discord.ui.button(label="Check Status", style=discord.ButtonStyle.primary, custom_id="log_check_status")
-    async def check_status(self, interaction: discord.Interaction, button: discord.ui.Button):
+
+class AdminLogView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    async def get_user_id_from_embed(self, message: discord.Message):
+        if message.embeds:
+            desc = message.embeds[0].description
+            for line in desc.split('\n'):
+                if "Telegram User ID:" in line:
+                    return int(line.split(":")[1].strip())
+        return None
+
+    @discord.ui.button(label="Delete Channel", style=discord.ButtonStyle.danger, custom_id="adm_log_delete_channel")
+    async def delete_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_id = await self.get_user_id_from_embed(interaction.message)
+        if not user_id: 
+            return await interaction.response.send_message("Could not find user ID.", ephemeral=True)
+            
+        ch_id = await database.get_discord_channel(user_id, 'Admin')
+        if ch_id:
+            ch = interaction.guild.get_channel(ch_id)
+            if ch:
+                await ch.delete(reason="Admin requested deletion via Log button.")
+            await database.delete_channel_mapping(ch_id)
+            await interaction.response.send_message("Admin Channel deleted and unmapped.", ephemeral=True)
+        else:
+            await interaction.response.send_message("No active Admin channel found for this user.", ephemeral=True)
+
+    @discord.ui.button(label="Admin Feedback", style=discord.ButtonStyle.success, custom_id="adm_log_send_feedback")
+    async def send_feedback(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = await self.get_user_id_from_embed(interaction.message)
         if not user_id: return
         if send_to_telegram_callback:
-            await send_to_telegram_callback(user_id, "⏳ Ningalude support ticket status njangal check cheyyukayanu. Dayavayi kshemayode kaathirikkuka.")
-        await interaction.response.send_message("Status inquiry sent to Telegram.", ephemeral=True)
+            await send_to_telegram_callback(user_id, "🛡️ Ningalude admin application interview poorntiyayi. Njangalude theerumanam udane ariyikkum. Abhiprayangal undo?")
+        await interaction.response.send_message("Admin Feedback request sent to Telegram.", ephemeral=True)
+
 
 class KanthariDiscordBot(discord.Client):
     def __init__(self, guild_id: int):
@@ -63,7 +90,8 @@ class KanthariDiscordBot(discord.Client):
         self.target_guild_id = guild_id
         
     async def setup_hook(self):
-        self.add_view(LogView())
+        self.add_view(SupportLogView())
+        self.add_view(AdminLogView())
 
     async def on_ready(self):
         logger.info(f'Logged in as {self.user}')
@@ -165,7 +193,8 @@ class KanthariDiscordBot(discord.Client):
             if log_ch:
                 embed = discord.Embed(title=f"New {category_name} Request", color=discord.Color.green())
                 embed.description = f"User Name: {username}\nTelegram User ID: {user_id}\nChannel: <#{channel.id}>"
-                await log_ch.send(embed=embed, view=LogView())
+                view = SupportLogView() if category_name == 'Support' else AdminLogView()
+                await log_ch.send(embed=embed, view=view)
             
         # Send message
         await channel.send(f"**From {username}:**\n{text}")
