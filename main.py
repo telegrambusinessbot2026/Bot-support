@@ -59,8 +59,12 @@ async def main():
     async def send_to_telegram(user_id: int, text: str):
         await telegram_bot.send_to_telegram(telegram_app, user_id, text)
         
+    async def set_telegram_permissions(user_id: int, is_on_duty: bool):
+        await telegram_bot.set_admin_duty_permissions(telegram_app, user_id, is_on_duty)
+        
     telegram_bot.send_to_discord_callback = send_to_discord
     discord_bot.send_to_telegram_callback = send_to_telegram
+    discord_bot.set_telegram_permissions_callback = set_telegram_permissions
     
     # Start the dummy server to satisfy Render's port binding health checks
     await start_dummy_server()

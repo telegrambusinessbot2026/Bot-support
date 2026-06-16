@@ -27,6 +27,21 @@ async def init_db():
                 content TEXT
             )
         ''')
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS admin_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                discord_user_id INTEGER,
+                start_time REAL,
+                end_time REAL,
+                total_seconds REAL
+            )
+        ''')
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS account_links (
+                telegram_user_id INTEGER PRIMARY KEY,
+                discord_user_id INTEGER UNIQUE
+            )
+        ''')
         await db.commit()
 
 async def get_or_create_user(user_id: int, username: str):
@@ -90,3 +105,42 @@ async def get_rule(language: str):
             if row:
                 return row[0]
             return "Rule content not available."
+
+async def link_account(telegram_id: int, discord_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('INSERT OR REPLACE INTO account_links (telegram_user_id, discord_user_id) VALUES (?, ?)', (telegram_id, discord_id))
+        await db.commit()
+
+async def get_telegram_id_from_discord(discord_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute('SELECT telegram_user_id FROM account_links WHERE discord_user_id = ?', (discord_id,)) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+async def start_admin_session(discord_id: int, start_time: float):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('INSERT INTO admin_sessions (discord_user_id, start_time) VALUES (?, ?)', (discord_id, start_time))
+        await db.commit()
+
+async def end_admin_session(discord_id: int, end_time: float):
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Find the most recent active session
+        async with db.execute('SELECT id, start_time FROM admin_sessions WHERE discord_user_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1', (discord_id,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                total_seconds = end_time - row[1]
+                await db.execute('UPDATE admin_sessions SET end_time = ?, total_seconds = ? WHERE id = ?', (end_time, total_seconds, row[0]))
+                await db.commit()
+                return total_seconds
+        return None
+
+async def get_total_admin_seconds(discord_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute('SELECT SUM(total_seconds) FROM admin_sessions WHERE discord_user_id = ?', (discord_id,)) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row and row[0] else 0.0
+
+async def get_all_admin_times():
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute('SELECT discord_user_id, SUM(total_seconds) FROM admin_sessions GROUP BY discord_user_id') as cursor:
+            return await cursor.fetchall()

@@ -1,11 +1,112 @@
 import discord
+from discord import app_commands
 import logging
 import database
+import time
+import datetime
 
 logger = logging.getLogger(__name__)
 
+# Configuration Variables
+DISCORD_ADMIN_ROLE_ID = 123456789012345678  # TODO: Replace with actual
+EXTERNAL_LOG_CHANNEL_ID = 123456789012345678 # TODO: Replace with actual
+
 # Injected from main.py
 send_to_telegram_callback = None
+set_telegram_permissions_callback = None
+
+async def update_leaderboard(guild: discord.Guild):
+    mgmt = discord.utils.get(guild.categories, name="Management")
+    if not mgmt: return
+    lb_ch = discord.utils.get(mgmt.channels, name="admin-leaderboard")
+    if not lb_ch:
+        lb_ch = await guild.create_text_channel('admin-leaderboard', category=mgmt)
+        
+    times = await database.get_all_admin_times()
+    
+    board = "🏆 **Admin Duty Leaderboard** 🏆\n\n"
+    for dc_id, total_sec in times:
+        member = guild.get_member(dc_id)
+        name = member.display_name if member else f"User {dc_id}"
+        hours, remainder = divmod(int(total_sec), 3600)
+        minutes, _ = divmod(remainder, 60)
+        board += f"```\n[Name]: {name}\n[User ID]: {dc_id}\n[Total Time Served/Duration]: {hours} Hours, {minutes} Minutes\n```\n"
+        
+    await lb_ch.purge(limit=10)
+    await lb_ch.send(board)
+
+class DutyToggleView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🟢 On Duty", style=discord.ButtonStyle.success, custom_id="btn_on_duty")
+    async def on_duty(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_id = interaction.user.id
+        tg_id = await database.get_telegram_id_from_discord(user_id)
+        if not tg_id:
+            return await interaction.response.send_message("You must link your Telegram account first using !link in #account-linking.", ephemeral=True)
+            
+        role = interaction.guild.get_role(DISCORD_ADMIN_ROLE_ID)
+        if role:
+            try:
+                await interaction.user.add_roles(role)
+            except Exception as e:
+                logger.error(f"Failed to add role: {e}")
+                
+        if set_telegram_permissions_callback:
+            success = await set_telegram_permissions_callback(tg_id, True)
+            if not success:
+                logger.error("Failed to grant Telegram permissions.")
+                
+        await database.start_admin_session(user_id, time.time())
+        
+        mgmt = discord.utils.get(interaction.guild.categories, name="Management")
+        if mgmt:
+            log_ch = discord.utils.get(mgmt.channels, name="on-duty-logs")
+            if not log_ch:
+                log_ch = await interaction.guild.create_text_channel('on-duty-logs', category=mgmt)
+            out = (f"```\n[Name]: {interaction.user.display_name}\n"
+                   f"[User ID]: {user_id}\n"
+                   f"[Duty Started At]: <t:{int(time.time())}:F>\n```")
+            await log_ch.send(out)
+            
+        await interaction.response.send_message("You are now On Duty. Telegram Permissions granted and Discord Role assigned.", ephemeral=True)
+
+    @discord.ui.button(label="🔴 Off Duty", style=discord.ButtonStyle.danger, custom_id="btn_off_duty")
+    async def off_duty(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_id = interaction.user.id
+        tg_id = await database.get_telegram_id_from_discord(user_id)
+        
+        role = interaction.guild.get_role(DISCORD_ADMIN_ROLE_ID)
+        if role:
+            try:
+                await interaction.user.remove_roles(role)
+            except Exception as e:
+                logger.error(f"Failed to remove role: {e}")
+                
+        if tg_id and set_telegram_permissions_callback:
+            await set_telegram_permissions_callback(tg_id, False)
+            
+        now = time.time()
+        total_sec = await database.end_admin_session(user_id, now)
+        if total_sec is None:
+            return await interaction.response.send_message("You are not currently on duty.", ephemeral=True)
+            
+        hours, remainder = divmod(int(total_sec), 3600)
+        minutes, _ = divmod(remainder, 60)
+        
+        mgmt = discord.utils.get(interaction.guild.categories, name="Management")
+        if mgmt:
+            log_ch = discord.utils.get(mgmt.channels, name="off-duty-logs")
+            if not log_ch:
+                log_ch = await interaction.guild.create_text_channel('off-duty-logs', category=mgmt)
+            out = (f"```\n[Name]: {interaction.user.display_name}\n"
+                   f"[User ID]: {user_id}\n"
+                   f"[Total Time Served/Duration]: {hours} Hours, {minutes} Minutes\n```")
+            await log_ch.send(out)
+            
+        await update_leaderboard(interaction.guild)
+        await interaction.response.send_message(f"You are now Off Duty. Logged {hours}h {minutes}m.", ephemeral=True)
 
 class SupportLogView(discord.ui.View):
     def __init__(self):
@@ -88,16 +189,66 @@ class KanthariDiscordBot(discord.Client):
         intents.guilds = True
         super().__init__(intents=intents)
         self.target_guild_id = guild_id
+        self.tree = app_commands.CommandTree(self)
         
     async def setup_hook(self):
         self.add_view(SupportLogView())
         self.add_view(AdminLogView())
+        self.add_view(DutyToggleView())
+        
+        guild = discord.Object(id=self.target_guild_id)
+        
+        @self.tree.command(name="link_account", description="Link a Telegram ID to a Discord ID", guild=guild)
+        @app_commands.describe(telegram_id="The Telegram User ID", discord_id="The Discord User ID")
+        async def link_account(interaction: discord.Interaction, telegram_id: str, discord_id: str):
+            if interaction.channel.name != 'account-linking':
+                return await interaction.response.send_message("This command can only be used in #account-linking.", ephemeral=True)
+            try:
+                tg_id = int(telegram_id)
+                dc_id = int(discord_id)
+                await database.link_account(tg_id, dc_id)
+                await interaction.response.send_message(f"Successfully linked Telegram ID {tg_id} to Discord ID {dc_id}.")
+            except ValueError:
+                await interaction.response.send_message("IDs must be numbers.", ephemeral=True)
+
+        @self.tree.command(name="member_info", description="Get join date and duration of a user", guild=guild)
+        @app_commands.describe(user_id="The Telegram User ID to search for")
+        async def member_info(interaction: discord.Interaction, user_id: str):
+            if interaction.channel.name != 'member-info':
+                return await interaction.response.send_message("This command can only be used in #member-info.", ephemeral=True)
+                
+            await interaction.response.defer()
+            join_log_ch = self.get_channel(EXTERNAL_LOG_CHANNEL_ID)
+            if not join_log_ch:
+                return await interaction.followup.send("Error: EXTERNAL_LOG_CHANNEL_ID is not configured correctly.")
+            
+            found = False
+            async for log_msg in join_log_ch.history(limit=5000):
+                if user_id in log_msg.content:
+                    found = True
+                    join_time = log_msg.created_at
+                    now = discord.utils.utcnow()
+                    diff = now - join_time
+                    days = diff.days
+                    hours, remainder = divmod(diff.seconds, 3600)
+                    minutes, _ = divmod(remainder, 60)
+                    
+                    out = (f"```\n[Name]: {user_id}\n"
+                           f"[User ID]: {user_id}\n"
+                           f"[Joined At]: {join_time.strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                           f"[Total Time Served/Duration]: {days} Days, {hours} Hours, {minutes} Minutes\n```")
+                    await interaction.followup.send(out)
+                    break
+            
+            if not found:
+                await interaction.followup.send(f"Could not find any join logs for user {user_id} in the external channel.")
+
+        await self.tree.sync(guild=guild)
 
     async def on_ready(self):
         logger.info(f'Logged in as {self.user}')
         guild = self.get_guild(self.target_guild_id)
         if not guild:
-            # Fallback to the first guild if specific ID is not found or not set
             if self.guilds:
                 guild = self.guilds[0]
                 self.target_guild_id = guild.id
@@ -107,14 +258,7 @@ class KanthariDiscordBot(discord.Client):
                 
         logger.info(f"Operating in guild: {guild.name}")
         
-        # Ensure categories exist
-        categories = {
-            'Support': None,
-            'Admin': None,
-            'Rules': None,
-            'Management': None
-        }
-        
+        categories = {'Support': None, 'Admin': None, 'Rules': None, 'Management': None}
         for cat in guild.categories:
             if cat.name in categories:
                 categories[cat.name] = cat
@@ -122,43 +266,50 @@ class KanthariDiscordBot(discord.Client):
         for name, cat in categories.items():
             if not cat:
                 categories[name] = await guild.create_category(name)
-                logger.info(f"Created category: {name}")
                 
-        # Ensure log channels exist
         mgmt_category = categories['Management']
-        for log_ch in ['support-logs', 'admin-logs']:
-            ch = discord.utils.get(mgmt_category.channels, name=log_ch)
+        mgmt_channels = ['support-logs', 'admin-logs', 'on-duty-logs', 'off-duty-logs', 'admin-leaderboard', 'duty-toggle', 'account-linking', 'member-info', 'bot-commands']
+        
+        for ch_name in mgmt_channels:
+            ch = discord.utils.get(mgmt_category.channels, name=ch_name)
             if not ch:
-                await guild.create_text_channel(log_ch, category=mgmt_category)
-                logger.info(f"Created log channel: {log_ch}")
+                await guild.create_text_channel(ch_name, category=mgmt_category)
                 
-        # Ensure rules channels exist and fetch rules
+        # Setup duty toggle buttons
+        duty_ch = discord.utils.get(mgmt_category.channels, name='duty-toggle')
+        if duty_ch:
+            await duty_ch.purge(limit=10)
+            await duty_ch.send("Toggle your Admin Duty status here:", view=DutyToggleView())
+            
+        # Setup bot commands
+        cmd_ch = discord.utils.get(mgmt_category.channels, name='bot-commands')
+        if cmd_ch:
+            await cmd_ch.purge(limit=10)
+            embed = discord.Embed(title="Bot Commands", description="Here are the available Slash Commands:", color=discord.Color.blue())
+            embed.add_field(name="/link_account <telegram_id> <discord_id>", value="Link an admin's Telegram account to their Discord account. Run this in `#account-linking`.", inline=False)
+            embed.add_field(name="/member_info <user_id>", value="Get the join date and duration of a user from the external join log. Run this in `#member-info`.", inline=False)
+            await cmd_ch.send(embed=embed)
+            
         rule_langs = ['English', 'Malayalam', 'Hindi', 'Manglish']
         rules_category = categories['Rules']
-        
         for lang in rule_langs:
             channel = discord.utils.get(rules_category.channels, name=lang.lower())
             if not channel:
                 channel = await guild.create_text_channel(lang.lower(), category=rules_category)
-                logger.info(f"Created rules channel: {lang}")
-            
-            # Fetch rule from channel
             messages = [message async for message in channel.history(limit=1)]
             if messages:
-                rule_text = messages[0].content
-                await database.update_rule(lang, rule_text)
+                await database.update_rule(lang, messages[0].content)
             else:
                 await database.update_rule(lang, f"No rules posted yet in #{channel.name}")
-                
+
     async def on_message(self, message: discord.Message):
         if message.author == self.user:
             return
             
-        # Ignore messages not in text channels
         if not isinstance(message.channel, discord.TextChannel):
             return
             
-        # Check if it's a rule update
+        # Rule updates
         if message.channel.category and message.channel.category.name == 'Rules':
             language = message.channel.name.capitalize()
             if language in ['English', 'Malayalam', 'Hindi', 'Manglish']:
@@ -167,10 +318,9 @@ class KanthariDiscordBot(discord.Client):
                 await message.channel.send("Rule successfully updated and synced to the bot.")
                 return
             
-        # Check if the channel is mapped to a telegram user
+        # Forward admin replies
         user_id = await database.get_telegram_user_from_channel(message.channel.id)
         if user_id and send_to_telegram_callback:
-            # Forward the admin's message back to telegram user
             await send_to_telegram_callback(user_id, message.content)
 
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
@@ -192,7 +342,6 @@ class KanthariDiscordBot(discord.Client):
         if not guild:
             return
             
-        # Check if channel exists
         channel_id = await database.get_discord_channel(user_id, category_name)
         channel = None
         
@@ -200,7 +349,6 @@ class KanthariDiscordBot(discord.Client):
             channel = guild.get_channel(channel_id)
             
         if not channel:
-            # Create channel
             category = discord.utils.get(guild.categories, name=category_name)
             if not category:
                 category = await guild.create_category(category_name)
@@ -222,7 +370,6 @@ class KanthariDiscordBot(discord.Client):
                     await send_to_telegram_callback(user_id, "Channel create cheyyan pattiyailla. Admins-odu parayuka.")
                 return
             
-            # Post to log channel
             log_ch_name = f"{category_name.lower()}-logs"
             mgmt_cat = discord.utils.get(guild.categories, name="Management")
             log_ch = discord.utils.get(mgmt_cat.channels, name=log_ch_name) if mgmt_cat else None
@@ -235,7 +382,6 @@ class KanthariDiscordBot(discord.Client):
             if category_name == 'Support' and send_to_telegram_callback:
                 await send_to_telegram_callback(user_id, "Ningalude ticket create aayittundu! Ningalukku admin-umayi bandhapendan ivide vannu samsarikkunnathaanu.")
             
-        # Send message
         await channel.send(f"**From {username}:**\n{text}")
 
 def setup_discord_bot(guild_id: int):

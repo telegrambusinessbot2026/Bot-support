@@ -18,6 +18,9 @@ INTERVIEW_QUESTIONS = [
 
 Q2, Q3, Q4, Q5, Q6, Q7 = range(6)
 
+# Configuration ID for Telegram Group
+TELEGRAM_GROUP_ID = "-100YOUR_GROUP_ID" # TODO: Replace with actual ID
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await database.get_or_create_user(user.id, user.username or user.first_name)
@@ -157,24 +160,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_to_telegram(app: Application, user_id: int, message: str):
     await app.bot.send_message(chat_id=user_id, text=message)
 
+async def set_admin_duty_permissions(app: Application, user_id: int, is_on_duty: bool):
+    try:
+        await app.bot.promote_chat_member(
+            chat_id=TELEGRAM_GROUP_ID,
+            user_id=user_id,
+            can_delete_messages=is_on_duty,
+            can_restrict_members=is_on_duty,
+            can_pin_messages=is_on_duty
+        )
+        return True
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to toggle Telegram permissions for {user_id}: {e}")
+        return False
+
 def setup_telegram_app(token: str):
     app = Application.builder().token(token).build()
     
     admin_conv_handler = ConversationHandler(
         entry_points=[CallbackQueryHandler(start_interview_q2, pattern='^admin_q1_yes$')],
         states={
-            Q2: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_q2)],
-            Q3: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_q3)],
-            Q4: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_q4)],
-            Q5: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_q5)],
-            Q6: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_q6)],
-            Q7: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_q7)],
+            Q2: [MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_q2)],
+            Q3: [MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_q3)],
+            Q4: [MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_q4)],
+            Q5: [MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_q5)],
+            Q6: [MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_q6)],
+            Q7: [MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_q7)],
         },
         fallbacks=[CommandHandler('cancel', cancel_interview)]
     )
     
     app.add_handler(admin_conv_handler)
-    app.add_handler(CommandHandler('start', start))
+    app.add_handler(CommandHandler('start', start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CallbackQueryHandler(button_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_message))
     return app
