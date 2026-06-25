@@ -19,6 +19,13 @@ try:
 except ValueError:
     EXTERNAL_LOG_CHANNEL_ID = 123456789012345678
 
+try:
+    DUTY_ACCESS_ROLE_ID = int(os.getenv("DUTY_ACCESS_ROLE_ID", "123456789012345678"))
+except ValueError:
+    DUTY_ACCESS_ROLE_ID = 123456789012345678
+
+import asyncio
+
 # Injected from main.py
 send_to_telegram_callback = None
 set_telegram_permissions_callback = None
@@ -43,12 +50,54 @@ async def update_leaderboard(guild: discord.Guild):
     await lb_ch.purge(limit=10)
     await lb_ch.send(board)
 
+async def auto_off_duty_timer(discord_id: int, start_time: float, guild: discord.Guild):
+    target_end = start_time + 1800 # 30 mins
+    now = time.time()
+    sleep_dur = target_end - now
+    if sleep_dur > 0:
+        await asyncio.sleep(sleep_dur)
+    
+    current_start = await database.get_active_session_start_time(discord_id)
+    if current_start and abs(current_start - start_time) < 1.0:
+        member = guild.get_member(discord_id)
+        if member:
+            role = guild.get_role(DISCORD_ADMIN_ROLE_ID)
+            if role:
+                try:
+                    await member.remove_roles(role)
+                except Exception as e:
+                    logger.error(f"Auto-off: Failed to remove role for {discord_id}: {e}")
+                    
+        tg_id = await database.get_telegram_id_from_discord(discord_id)
+        if tg_id and set_telegram_permissions_callback:
+            await set_telegram_permissions_callback(tg_id, False)
+            
+        now_time = time.time()
+        total_sec = await database.end_admin_session(discord_id, now_time)
+        if total_sec is not None:
+            hours, remainder = divmod(int(total_sec), 3600)
+            minutes, _ = divmod(remainder, 60)
+            
+            mgmt = discord.utils.get(guild.categories, name="Management")
+            if mgmt:
+                log_ch = discord.utils.get(mgmt.channels, name="off-duty-logs")
+                if log_ch:
+                    out = (f"```\n[Name]: {member.display_name if member else discord_id}\n"
+                           f"[User ID]: {discord_id}\n"
+                           f"[Total Time Served/Duration]: {hours} Hours, {minutes} Minutes (Auto-Timeout)\n```")
+                    await log_ch.send(out)
+            
+            await update_leaderboard(guild)
+
 class DutyToggleView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="🟢 On Duty", style=discord.ButtonStyle.success, custom_id="btn_on_duty")
     async def on_duty(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not any(role.id == DUTY_ACCESS_ROLE_ID for role in interaction.user.roles):
+            return await interaction.response.defer(ephemeral=True)
+            
         user_id = interaction.user.id
         tg_id = await database.get_telegram_id_from_discord(user_id)
         if not tg_id:
@@ -66,7 +115,9 @@ class DutyToggleView(discord.ui.View):
             if not success:
                 logger.error("Failed to grant Telegram permissions.")
                 
-        await database.start_admin_session(user_id, time.time())
+        start_time = time.time()
+        await database.start_admin_session(user_id, start_time)
+        asyncio.create_task(auto_off_duty_timer(user_id, start_time, interaction.guild))
         
         mgmt = discord.utils.get(interaction.guild.categories, name="Management")
         if mgmt:
@@ -75,13 +126,16 @@ class DutyToggleView(discord.ui.View):
                 log_ch = await interaction.guild.create_text_channel('on-duty-logs', category=mgmt)
             out = (f"```\n[Name]: {interaction.user.display_name}\n"
                    f"[User ID]: {user_id}\n"
-                   f"[Duty Started At]: <t:{int(time.time())}:F>\n```")
+                   f"[Duty Started At]: <t:{int(start_time)}:F>\n```")
             await log_ch.send(out)
             
         await interaction.response.send_message("You are now On Duty. Telegram Permissions granted and Discord Role assigned.", ephemeral=True)
 
     @discord.ui.button(label="🔴 Off Duty", style=discord.ButtonStyle.danger, custom_id="btn_off_duty")
     async def off_duty(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not any(role.id == DUTY_ACCESS_ROLE_ID for role in interaction.user.roles):
+            return await interaction.response.defer(ephemeral=True)
+            
         user_id = interaction.user.id
         tg_id = await database.get_telegram_id_from_discord(user_id)
         
@@ -265,6 +319,10 @@ class KanthariDiscordBot(discord.Client):
                 return
                 
         logger.info(f"Operating in guild: {guild.name}")
+        
+        active_sessions = await database.get_all_active_sessions()
+        for dc_id, start_time in active_sessions:
+            asyncio.create_task(auto_off_duty_timer(dc_id, start_time, guild))
         
         categories = {'Support': None, 'Admin': None, 'Rules': None, 'Management': None}
         for cat in guild.categories:

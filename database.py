@@ -144,3 +144,14 @@ async def get_all_admin_times():
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute('SELECT discord_user_id, SUM(total_seconds) FROM admin_sessions GROUP BY discord_user_id') as cursor:
             return await cursor.fetchall()
+
+async def get_active_session_start_time(discord_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute('SELECT start_time FROM admin_sessions WHERE discord_user_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1', (discord_id,)) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+async def get_all_active_sessions():
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute('SELECT discord_user_id, start_time FROM admin_sessions WHERE end_time IS NULL') as cursor:
+            return await cursor.fetchall()
