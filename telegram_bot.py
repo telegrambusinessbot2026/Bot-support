@@ -16,10 +16,12 @@ INTERVIEW_QUESTIONS = [
     "7. Nammude group-inte suraksha (security) kootunnathinum, member-skk vendi kooduthal nalla karyangal cheyyunnathinum ningalkku enthenkilum puthiya ideas undo?"
 ]
 
+import os
+
 Q2, Q3, Q4, Q5, Q6, Q7 = range(6)
 
 # Configuration ID for Telegram Group
-TELEGRAM_GROUP_ID = "-100YOUR_GROUP_ID" # TODO: Replace with actual ID
+TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID", "-100YOUR_GROUP_ID")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user

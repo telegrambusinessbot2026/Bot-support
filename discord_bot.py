@@ -4,12 +4,20 @@ import logging
 import database
 import time
 import datetime
+import os
 
 logger = logging.getLogger(__name__)
 
 # Configuration Variables
-DISCORD_ADMIN_ROLE_ID = 123456789012345678  # TODO: Replace with actual
-EXTERNAL_LOG_CHANNEL_ID = 123456789012345678 # TODO: Replace with actual
+try:
+    DISCORD_ADMIN_ROLE_ID = int(os.getenv("DISCORD_ADMIN_ROLE_ID", "123456789012345678"))
+except ValueError:
+    DISCORD_ADMIN_ROLE_ID = 123456789012345678
+
+try:
+    EXTERNAL_LOG_CHANNEL_ID = int(os.getenv("EXTERNAL_LOG_CHANNEL_ID", "123456789012345678"))
+except ValueError:
+    EXTERNAL_LOG_CHANNEL_ID = 123456789012345678
 
 # Injected from main.py
 send_to_telegram_callback = None
